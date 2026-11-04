@@ -96,6 +96,7 @@ export const specDocument = {
     "Healing hold pauses the transmitter, following the Nun-root sequencing note.",
     "Install QR and pair QR. The install QR opens the GitHub setup. The pair QR carries this machine’s ML-KEM-768 public key.",
     "Optical sensor and video-codec add-on. A camera, a photo, or a WebM/MP4 is locked with the same finder path, with color slack for a camera or a compressed frame.",
+    "Agent API at POST /api/agent. An agent starts a session with keygen, pair, open, read, and ack. It does not click the dashboard.",
   ],
   recorded: [
     "The whitepaper names an AES-512 wrapper. AES-512 is not a NIST mode, and this gate does not implement it. Secrecy here is AES-256-GCM.",
