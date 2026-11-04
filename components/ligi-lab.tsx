@@ -12,6 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { BenchPanel } from "@/components/bench-panel";
+import { LinkPanel } from "@/components/link-panel";
 import { SpecPanel } from "@/components/spec-panel";
 import { SourcesPanel } from "@/components/sources-panel";
 import { cellProfiles, type CellProfile } from "@/lib/bench";
@@ -21,6 +22,7 @@ import { headerHex } from "@/lib/ligi/header";
 import { photonicHandshake } from "@/lib/ligi/handshake";
 import { base64ToBytes, bytesToBase64, fingerprint, generateKemKeys, MLKEM768 } from "@/lib/ligi/kem";
 import { mulberry32 } from "@/lib/ligi/rng";
+import type { PairTicket } from "@/lib/ligi/pair";
 import { ingestPanel, MAX_PLAINTEXT_BYTES, openCaptured, prepareSession, renderFrame, type KemTransport, type Session } from "@/lib/ligi/session";
 import type { CapturedFrame } from "@/lib/ligi/frame";
 
@@ -326,21 +328,13 @@ export function Lab({ sensor }: { sensor: boolean }) {
   }, [kemMode, kemOwner]);
 
   useEffect(() => {
-    if (!sensor) return;
+    if (kemSecretRef.current) return;
     const keys = generateKemKeys();
     kemSecretRef.current = keys.secretKey;
     kemPublicRef.current = keys.publicKey;
     setLocalFingerprint(fingerprint(keys.publicKey));
     setLocalPublicKey(bytesToBase64(keys.publicKey));
-  }, [sensor]);
-
-  useEffect(() => {
-    if (sensor || kemMode === "off" || kemOwner !== "page" || kemSecretRef.current) return;
-    const keys = generateKemKeys();
-    kemSecretRef.current = keys.secretKey;
-    kemPublicRef.current = keys.publicKey;
-    setLocalFingerprint(fingerprint(keys.publicKey));
-  }, [sensor, kemMode, kemOwner]);
+  }, []);
 
   useEffect(() => {
     const channel = new BroadcastChannel(CHANNEL);
@@ -547,7 +541,32 @@ export function Lab({ sensor }: { sensor: boolean }) {
     kemSecretRef.current = keys.secretKey;
     kemPublicRef.current = keys.publicKey;
     setLocalFingerprint(fingerprint(keys.publicKey));
+    setLocalPublicKey(bytesToBase64(keys.publicKey));
     setKemOwner("page");
+  }
+
+  function applyRemoteKey(ticket: PairTicket) {
+    remotePublicRef.current = ticket.publicKey;
+    setRemoteFingerprint(ticket.fingerprint);
+    setPastedKey(bytesToBase64(ticket.publicKey));
+    setKemOwner("window");
+    setKemMode("optical");
+    setError(null);
+    setAckNote(`Paired with ${ticket.fingerprint}. Open the gate. The other machine reads by ${ticket.transport === "video" ? "video" : "camera"}.`);
+  }
+
+  function watchExternal(panel: Panel) {
+    const idle = bucketsRef.current.length === 0 || bucketsRef.current.every((bucket) => bucket.frames.size === 0 && bucket.status === "idle");
+    if (idle) {
+      generation.current += 1;
+      if (startedAt.current === 0) startedAt.current = performance.now();
+      bucketsRef.current = makeBuckets([lossRef.current[0] ?? 0.08], true, 0xc0ffee).map((bucket) => ({
+        ...bucket,
+        status: "listening" as const,
+        note: "Reading an optical sensor or a video.",
+      }));
+    }
+    onFrameRef.current(panel);
   }
 
   async function onFile(file: File | undefined) {
@@ -582,7 +601,7 @@ export function Lab({ sensor }: { sensor: boolean }) {
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground md:text-base">
             {sensor
               ? "Sensor window. It samples frames from a gate opened on this computer and rebuilds the payload from the pixels."
-              : "A display-to-sensor lab for Bojan Petar Milanovic’s LiGi protocol. The panel is the channel."}
+              : "A display-to-sensor lab for Bojan Petar Milanovic’s LiGi protocol. The panel is the channel. A second machine reads it with a camera or a video file."}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -915,6 +934,15 @@ export function Lab({ sensor }: { sensor: boolean }) {
               ))}
               </div>
           </div>
+          <LinkPanel
+            publicKey={localPublicKey}
+            fingerprint={localFingerprint}
+            geometry={{ cellPx, gap: gapFor(cellPx), stride }}
+            canvasRef={canvasRef}
+            painting={!sensor && running}
+            onPair={applyRemoteKey}
+            onSeen={watchExternal}
+          />
         </TabsContent>
         <TabsContent value="bench" className="mt-4">
           <BenchPanel onApply={applyProfile} disabled={running} />
