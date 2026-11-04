@@ -954,6 +954,13 @@ export function Lab({ sensor }: { sensor: boolean }) {
           <SourcesPanel />
         </TabsContent>
       </Tabs>
+      <footer className="mt-8 border-t border-border pt-4 text-xs leading-relaxed text-muted-foreground">
+        Copyright © 2026 Bojan Milanovic. All Rights Reserved. The notice from{" "}
+        <a className="text-primary underline-offset-4 hover:underline" href="https://github.com/bis3946">
+          github.com/bis3946
+        </a>{" "}
+        is in LICENSE and NOTICE. Use, reproduction, and modification require prior written consent.
+      </footer>
     </div>
   );
 }
