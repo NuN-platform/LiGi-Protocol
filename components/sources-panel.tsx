@@ -22,7 +22,7 @@ export function SourcesPanel() {
       <Card className="gap-3 p-5">
         <h3 className="font-display text-xl">Geometric optical key exchange</h3>
         <p className="text-sm text-muted-foreground">
-          Stored in the author's Drive as frequency, hex mark, and Fibonacci-Ising state. The gate shows the table.
+          Stored in the author&apos;s Drive as frequency, hex mark, and Fibonacci-Ising state. The gate shows the table.
           It does not transmit on these carriers.
         </p>
         <div className="overflow-x-auto">
