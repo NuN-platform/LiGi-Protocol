@@ -1,6 +1,6 @@
 {
   "name": "ligi-protocol-dashboard",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack -H 0.0.0.0 -p 41731",
@@ -16,8 +16,10 @@
     "class-variance-authority": "^0.7.1",
     "cn": "^0.5.2",
     "fflate": "^0.8.3",
+    "jsqr": "^1.4.0",
     "lucide-react": "^1.68.0",
     "next": "15.5.29",
+    "qrcode": "^1.5.4",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "shadcn": "^4.23.0",
@@ -27,6 +29,7 @@
     "@eslint/eslintrc": "^3",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",

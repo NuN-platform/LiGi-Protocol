@@ -211,14 +211,39 @@ export function cornerLineFit(
   return null;
 }
 
-function finderCenter(panel: Panel, col: number, row: number, cellPx: number): { x: number; y: number } | null {
+function colorNear(r: number, g: number, b: number, er: number, eg: number, eb: number, colorSlack: number): boolean {
+  const dr = r - er;
+  const dg = g - eg;
+  const db = b - eb;
+  if (colorSlack <= 0) return dr === 0 && dg === 0 && db === 0;
+  return dr * dr + dg * dg + db * db <= colorSlack * colorSlack;
+}
+
+export function nearestByte(r: number, g: number, b: number, index: number): number {
+  let best = 0;
+  let bestDistance = Number.POSITIVE_INFINITY;
+  for (let value = 0; value < 256; value++) {
+    const [er, eg, eb] = byteColor(value, index);
+    const dr = r - er;
+    const dg = g - eg;
+    const db = b - eb;
+    const distance = dr * dr + dg * dg + db * db;
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      best = value;
+    }
+  }
+  return best;
+}
+
+function finderCenter(panel: Panel, col: number, row: number, cellPx: number, colorSlack = 0): { x: number; y: number } | null {
   const index = row * COLS + col;
   const [r, g, b] = byteColor(FINDER_BYTE, index);
   const hits: { x: number; y: number }[] = [];
   for (let y = 0; y < panel.height; y++) {
     for (let x = 0; x < panel.width; x++) {
       const p = (y * panel.width + x) * 4;
-      if (panel.rgba[p] === r && panel.rgba[p + 1] === g && panel.rgba[p + 2] === b) hits.push({ x, y });
+      if (colorNear(panel.rgba[p], panel.rgba[p + 1], panel.rgba[p + 2], r, g, b, colorSlack)) hits.push({ x, y });
     }
   }
   if (hits.length < 4) return null;
@@ -250,19 +275,30 @@ function finderCenter(panel: Panel, col: number, row: number, cellPx: number): {
 
 export type LockResult = { ok: true; cells: Uint8Array; factor: number } | { ok: false; reason: string };
 
+function cellsFromSamples(
+  samples: Uint8ClampedArray,
+  colorSlack: number,
+): { ok: true; cells: Uint8Array } | { ok: false; reason: string } {
+  if (colorSlack <= 0) return rgbaToCells(samples);
+  if (samples.length !== COLS * ROWS * 4) return { ok: false, reason: "Sampled panel has the wrong number of cells." };
+  const cells = new Uint8Array(COLS * ROWS);
+  for (let i = 0; i < cells.length; i++) cells[i] = nearestByte(samples[i * 4], samples[i * 4 + 1], samples[i * 4 + 2], i);
+  return { ok: true, cells };
+}
+
 /** Lock a gate inside a larger frame: finder centroids, edge line-fit, aspect, then pitch factors. */
-export function lockPanel(panel: Panel, hint: Geometry): LockResult {
+export function lockPanel(panel: Panel, hint: Geometry, colorSlack = 0): LockResult {
   const size = panelSize(hint.cellPx, hint.gap);
   if (panel.width === size.width && panel.height === size.height) {
     const sampled = samplePanel(panel, hint.cellPx, hint.gap, 0, 0, hint.stride);
-    const cells = rgbaToCells(sampled);
+    const cells = cellsFromSamples(sampled, colorSlack);
     if (!cells.ok) return cells;
     return { ok: true, cells: cells.cells, factor: 1 };
   }
 
-  const anchor = finderCenter(panel, 0, 0, hint.cellPx);
-  const across = finderCenter(panel, COLS - 2, 0, hint.cellPx);
-  const down = finderCenter(panel, 0, ROWS - 2, hint.cellPx);
+  const anchor = finderCenter(panel, 0, 0, hint.cellPx, colorSlack);
+  const across = finderCenter(panel, COLS - 2, 0, hint.cellPx, colorSlack);
+  const down = finderCenter(panel, 0, ROWS - 2, hint.cellPx, colorSlack);
   if (!anchor || !across || !down) return { ok: false, reason: "No lock. Finder corners were not in the frame." };
 
   const tolerance = Math.max(2, hint.cellPx * 0.35);
@@ -285,7 +321,7 @@ export function lockPanel(panel: Panel, hint: Geometry): LockResult {
     for (const dx of [0, -1, 1, -2, 2]) {
       for (const dy of [0, -1, 1, -2, 2]) {
         const sampled = samplePanel(panel, cellPx, gap, originX + dx, originY + dy, hint.stride);
-        const cells = rgbaToCells(sampled);
+        const cells = cellsFromSamples(sampled, colorSlack);
         if (!cells.ok) {
           last = cells.reason;
           continue;
