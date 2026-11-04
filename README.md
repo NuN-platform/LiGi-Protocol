@@ -2,7 +2,7 @@
 
 LiGi is a visible-light protocol. A display is the transmitter. A sensor reads geometric cells off that display, rebuilds the payload, and checks it. This repository is a browser gate for that protocol: fountain-coded frames, an optical handshake signature, and a post-quantum rendezvous with ML-KEM-768.
 
-The gate is a lab, not a radio stack. It paints frames on a page. It does not open a camera, bind a UDP port, or run a quantum processor.
+The gate is a lab, not a radio stack. It paints frames on a page. A second machine can read those frames with its camera or by playing a video file recorded from the panel. The page does not bind a UDP port or run a quantum processor.
 
 ## How LiGi works
 
@@ -66,7 +66,7 @@ Three roles use the gate. The letter in the tables below is the role, not a sepa
 
 The optical payload always travels from a machine that can paint to a sensor that can sample. Agents arrange keys and tell a machine to paint. A sensor can later become a sender by opening its own gate on a machine it controls. That is how every combination below stays the same protocol: ML-KEM toward whoever must read the plaintext, frames toward whoever must see the panel, and the VSha-3946 signature as the shared optical stamp.
 
-The dashboard implements one hop of this. `BroadcastChannel` `ligi-gate-v2` reaches other windows on the same browser and the same origin. It does not cross the public network. A second computer runs its own copy of the gate. Public keys can be copied by hand. Painted frames still have to be on a display that the other sensor can see.
+The dashboard implements one hop of this. `BroadcastChannel` `ligi-gate-v2` reaches other windows on the same browser and the same origin. Two machines reach each other by light or by a video file. The reader shows a pair QR that carries its ML-KEM public key. The sender scans that QR, opens the gate, and either leaves the panel on a display the reader’s camera can see, or records `ligi-gate.webm` for the reader to play. There is still no socket between the machines. A further hop is a new session.
 
 ### Every A/M/S pair
 
@@ -76,7 +76,7 @@ The dashboard implements one hop of this. `BroadcastChannel` `ligi-gate-v2` reac
 | A2M | Agent A asks machine M to carry bytes for storage or relay. | Machine M. | M publishes its public key. A encapsulates to M. The shared secret never returns to A in the clear. | M can stamp the panel it is about to paint. | Run the gate on M with **Key on this page**. A is the operator who presses **Open the gate**. |
 | A2S | Agent A addresses a sensor directly. | Sensor S. | S holds the secret. A encapsulates to S’s public key. | S is the party whose lux reading matches the signature. | **Sensor window**, or paste the key shown in the sensor window. Leave sharing on. |
 | M2A | Machine M already has a payload and an agent is the reader. | Agent A. | A generates the key pair. M encapsulates and paints. A decapsulates. | M paints. A checks the signature against the lux it was told. | M runs the transmitter. A’s browser is the sensor window and holds the secret. |
-| M2M | Machine M1 paints for machine M2. | Machine M2. | M2’s public key is installed on M1. M1 encapsulates. M2 samples the panel and decapsulates. | Each machine can record lux. The signatures match when the stamped lux and time match. | This is the SN2 optical ladder: one host paints, the other locks cells. Two browser windows on one host demonstrate it. Two hosts need a real display between them. |
+| M2M | Machine M1 paints for machine M2. | Machine M2. | M2’s public key is installed on M1. M1 encapsulates. M2 samples the panel and decapsulates. | Each machine can record lux. The signatures match when the stamped lux and time match. | M2 shows the pair QR. M1 scans it with the optical sensor, or loads a photo of it. M2 then points its camera at M1’s panel, or plays the WebM M1 recorded. |
 | M2S | A machine paints for a sensor. This is the normal LiGi hop. | Sensor S. | S holds the secret. The ciphertext is optical, or the network fallback when the ciphertext is not placed in the cells. | S is looking at the panel, so its lux stamp is the one that belongs on the session. | Open the gate. The three on-page sensors are S. Choose **Optical CT** or **Network fallback**. |
 | S2A | A sensor has recovered a payload and must hand it to an agent. | Agent A. | The sensor’s machine opens a new session toward A’s public key. | The new session gets a new stamp. The old session’s hash is inside the new plaintext, so A can see what was recovered. | Copy the recovered text, paste A’s public key, open a new gate. |
 | S2M | A sensor reports a result to a machine. | Machine M. | M publishes a public key. The sensor’s host encapsulates to it. | Optional. The report can include the previous signature string as text. | Same as S2A, with M’s key in the paste field. **Network fallback** keeps a large ciphertext off the panel if M and the sensor share the local channel. |
@@ -93,6 +93,38 @@ Mixed paths are the same rules stacked. An agent tells a machine to paint for a 
 | Any observer of the panel | Ciphertext and sealed frames, if they can read the cells. | A plaintext, unless the session was left unsealed. |
 
 The page shows the shared-secret hash so two parties can confirm they derived the same secret, which is the check recorded in the SN2 ML-KEM self-test. It does not print the secret itself.
+
+## Install on any machine
+
+Both machines run the same repository. A phone camera can open this section by scanning the install QR on the Gate tab. The code in that QR is:
+
+`https://github.com/NuN-platform/LiGi-Protocol#install-on-any-machine`
+
+Requirements: Node.js 20 or newer, and npm 10 or newer. No account, camera driver, or API key. A camera is optional and is used only when that machine is the optical sensor.
+
+```bash
+git clone https://github.com/NuN-platform/LiGi-Protocol.git
+cd LiGi-Protocol
+npm install
+npm test
+npm run dev
+```
+
+Open [http://127.0.0.1:41731](http://127.0.0.1:41731) on that machine. Another computer cannot open that address. It runs its own copy.
+
+### Start a session between two machines
+
+1. Install and start the gate on both machines.
+2. On the reader, choose **I will use the camera** or **I will play a video**. The pair QR changes with that choice. It contains this machine’s ML-KEM-768 public key and nothing secret. **Download pair ticket** writes the same text to `ligi-pair.txt` if a camera cannot see the QR.
+3. On the sender, start the camera and point it at the reader’s pair QR, or load a photo of that QR. The sender’s ML-KEM switch turns on and the key is filled in. The reader keeps the secret.
+4. On the sender, press **Open the gate**.
+5. The reader either points **Optical sensor** at the sender’s panel, or the sender presses **Record panel**, saves `ligi-gate.webm`, and the reader presses **Play a video**.
+
+The optical lock allows a color slack of 48, because a camera and a WebM encoder both shift the painted colors. The frame checksum still rejects a glare stripe. Select the same cell profile on both machines. **Lab 18** is the easiest panel to film. **c8** matches the newest SN2 pass and is harder for a camera to resolve.
+
+One photo of the panel is a single frame. A fountain session needs the video, or a live camera that stays on the panel, so later frames can repair the ones that were missed. The three on-page sensors still compare hashes when the sender is watching its own panel. A remote reader uses the one sensor fed by the camera or the video.
+
+`BroadcastChannel` remains the path between two windows on one computer. The camera and the video file are the path between two computers. Neither path is a peer socket, and neither is the Flask JSONL chain on bis3946-pc.
 
 ## Run the gate
 
@@ -129,6 +161,10 @@ npm start
 | Stride | 1 to 8. The October optical passes used 6. |
 | Occlusion | Rejects frames whose cells are covered. Distinct from loss, which drops a whole frame. |
 | Share with other windows | Publishes pixels on `BroadcastChannel` `ligi-gate-v2`. |
+| Install QR | Opens the install section of this README on GitHub. |
+| Pair QR | Carries this machine’s ML-KEM public key. The sender scans it before opening the gate. |
+| Optical sensor | Reads a camera, or a photo of a QR or a panel. |
+| Video codec add-on | Records `ligi-gate.webm` from the panel, or plays that file on the reader. |
 | Passphrase | AES-256-GCM. Empty means the payload is unsealed. Disabled while ML-KEM is on. |
 | Optical CT | ML-KEM ciphertext is inside the painted payload. |
 | Network fallback | Ciphertext travels on the local channel. The payload stays on the panel. |
@@ -148,11 +184,11 @@ No fountain codec was in those public GitHub repositories. This dashboard is tha
 
 ## What is left out of the gate
 
-The dissertation’s infrared and tactical passages are not implemented. The UDP sketch on port 3946 is not bound. The gate does not drive a camera or a physical panel. AES-512 is not implemented.
+The dissertation’s infrared and tactical passages are not implemented. The UDP sketch on port 3946 is not bound. AES-512 is not implemented. The optical sensor reads a camera; it does not drive a laboratory camera rig or a physical panel. A video file is a recording of the panel, not a live stream between hosts.
 
 ## Files omitted from Git
 
-`.gitignore` keeps generated and local files out of a GitHub push. The commit contains source, tests, `package.json`, and `package-lock.json`. It does not contain:
+`.gitignore` keeps generated and local files out of a GitHub push. The commit contains the application source, the tests, and `package.json`. It does not contain:
 
 - `node_modules/` and package-manager caches
 - `.next/`, `out/`, `build/`, and `dist/`
