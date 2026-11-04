@@ -144,7 +144,7 @@ npm run build
 npm start
 ```
 
-`npm test` covers the header, the fountain codec, occlusion, the passphrase, the c8 stride lock, ML-KEM encapsulation, the optical ciphertext, the network fallback, and the HMAC acknowledgement. `GET /api/spec` returns the specification summary as JSON.
+`npm test` covers the header, the fountain codec, occlusion, the passphrase, the c8 stride lock, ML-KEM encapsulation, the optical ciphertext, the network fallback, the HMAC acknowledgement, and an agent session started from a pair ticket. `GET /api/spec` returns the specification summary as JSON.
 
 ### Operate a session
 
@@ -200,6 +200,28 @@ The dissertation’s infrared and tactical passages are not implemented. The UDP
 
 No secret is required to run the lab. Do not add key files to override the ignore list.
 
+## Agents
+
+An agent does not click the dashboard. It starts the same protocol over `POST /api/agent` on the machine that is running the gate. The body is JSON and the `action` is one of `keygen`, `pair`, `open`, `read`, or `ack`.
+
+1. The reading agent calls `keygen`. The response holds its ML-KEM-768 secret, its public key, and a `LIGI1` pair ticket. The secret stays on that agent.
+2. The sending agent calls `pair` with that ticket, or uses the public key directly.
+3. The sending agent calls `open` with the payload and the reader public key. The response is the painted frames, already read back from the panel, plus the sender’s shared secret. That secret is not forwarded.
+4. The reading agent calls `read` with the frames and its own secret. Optical ciphertext travels inside the frames. A `network` open leaves the ciphertext in `cipherText`, and `read` waits until that value arrives.
+5. The sending agent calls `ack` with the reader’s `ackHex` and its own shared secret. `match: true` means the HMAC agrees.
+
+```bash
+curl -s -X POST http://127.0.0.1:41731/api/agent \
+  -H 'content-type: application/json' \
+  -d '{"action":"keygen","transport":"optical"}'
+```
+
+This is the local gate API. It is not a peer socket and it is not the Flask JSONL chain on bis3946-pc. A camera or a video file is still how a second machine reads a painted panel when the frames are not passed as JSON.
+
 ## License
 
-Apache License 2.0. The full text is in `LICENSE`.
+Copyright © 2026 Bojan Milanovic. All Rights Reserved.
+
+The terms are the notice on <https://github.com/bis3946> (`NOTICE` in the profile repository). The same text is in `LICENSE` and `NOTICE` here. It applies to this repository.
+
+Unauthorized use, reproduction, modification, distribution, or reverse engineering of this software without prior written consent is prohibited. The Rightsholder reserves civil and criminal remedies and full restitution for damages and legal costs.
